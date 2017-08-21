@@ -294,10 +294,30 @@ int	get_family(t_opts *opts)
 		return AF_UNSPEC;
 }
 
-// TODO: Handle ^C
+int	ft_getaddr(t_opts *opts, struct addrinfo *out) {
+	struct addrinfo hints = {0};
+	struct addrinfo *addr_out;
+
+	hints.ai_family = get_family(opts);
+	if (getaddrinfo(opts->host, NULL, &hints, &addr_out) != 0) {
+		perror("error getaddrinfo");
+		return (1);
+	}
+	while (addr_out != NULL && (addr_out->ai_family != AF_INET && addr_out->ai_family != AF_INET6)) {
+		addr_out = addr_out->ai_next;
+	}
+	if (addr_out == NULL) {
+		printf("error getaddrinfo: no ip info\n");
+		return (1);
+	}
+	*out = *addr_out;
+	return (0);
+}
+
+
 int	main(int argc, char **argv)
 {
-	struct addrinfo	*addr_out;
+	struct addrinfo	addr_out;
 	int		sock;
 	t_opts		opts;
 	char		*addr_str;
@@ -308,31 +328,19 @@ int	main(int argc, char **argv)
 		printf(HELP_STR);
 		return (2);
 	}
-	hints.ai_family = get_family(&opts);
-	hints.ai_flags = AI_CANONNAME;
-	if (getaddrinfo(opts.host, NULL, &hints, &addr_out) != 0) {
-		perror("error getaddrinfo");
+	if (ft_getaddr(&opts, &addr_out)) {
 		return (1);
 	}
-
-	// TODO: Fix ipv6 on my stupid machine
-	while (addr_out != NULL && (addr_out->ai_family != AF_INET && addr_out->ai_family != AF_INET6)) {
-		addr_out = addr_out->ai_next;
-	}
-	if (addr_out == NULL) {
-		printf("error getaddrinfo: no ip info\n");
-		return (1);
-	}
-	if (addr2str(addr_out->ai_addr, addr_out->ai_addrlen, !opts.numeric_output, &addr_str) == NULL) {
+	if (addr2str(addr_out.ai_addr, addr_out.ai_addrlen, !opts.numeric_output, &addr_str) == NULL) {
 		perror("error inet_ntop");
 		return (1);
 	}
 
-	if ((sock = connect_sock(addr_out->ai_addr)) <= 0)
+	if ((sock = connect_sock(addr_out.ai_addr)) <= 0)
 		return (1);
 
 	if (setup_sock(sock) < 0)
 		return (1);
 
-	return (ping_loop(sock, addr_out, &opts, addr_str));
+	return (ping_loop(sock, &addr_out, &opts, addr_str));
 }
