@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   ping.c                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: rlambert <marvin@42.fr>                    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2017/08/21 10:28:51 by rlambert          #+#    #+#             */
+/*   Updated: 2017/08/21 17:34:44 by rlambert         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include <unistd.h>
 #include <stdio.h>
 #include <arpa/inet.h>
@@ -13,36 +25,28 @@
 #define PAYLOAD_LEN sizeof(struct timeval)
 #define PACKET_LEN (sizeof(struct icmphdr) + PAYLOAD_LEN)
 #define MAX_DNSLEN 1024
-#define HELP_STR "Usage: ping [-hvn] destination\n"
+#define HELP_STR "Usage: ft_ping [-hvn] destination\n"
 
-typedef struct	s_opts
+short			ft_htons(short num)
 {
-	int help;
-	int verbose;
-	int v4;
-	int v6;
-	int numeric_output;
-	char *host;
-}		t_opts;
-
-short	ft_htons(short num)
-{
-	return num >> 8 | num << 8;
+	return (num >> 8 | num << 8);
 }
 
-const char	*addr2str(struct sockaddr *addr, socklen_t addrlen, int nameinfo, char **addr_str)
+const char		*addr2str(struct sockaddr *addr, socklen_t addrlen, int nameinfo,
+		char **addr_str)
 {
 	const void	*res;
 	char		ip_addr[INET6_ADDRSTRLEN];
 	char		host_addr[MAX_DNSLEN];
 
-
-	(void)addrlen;
-	(void)nameinfo;
 	if (addr->sa_family == AF_INET)
-		res = inet_ntop(addr->sa_family, &((struct sockaddr_in*)addr)->sin_addr, ip_addr, INET6_ADDRSTRLEN);
+		res = inet_ntop(addr->sa_family,
+				&((struct sockaddr_in*)addr)->sin_addr,
+				ip_addr, INET6_ADDRSTRLEN);
 	else if (addr->sa_family == AF_INET6)
-		res = inet_ntop(addr->sa_family, &((struct sockaddr_in6*)addr)->sin6_addr, ip_addr, INET6_ADDRSTRLEN);
+		res = inet_ntop(addr->sa_family,
+				&((struct sockaddr_in6*)addr)->sin6_addr,
+				ip_addr, INET6_ADDRSTRLEN);
 	else
 		return (NULL);
 	if (res == NULL)
@@ -52,27 +56,26 @@ const char	*addr2str(struct sockaddr *addr, socklen_t addrlen, int nameinfo, cha
 	} else {
 		*addr_str = ft_strdup(ip_addr);
 	}
-	return *addr_str;
+	return (*addr_str);
 }
 
-uint32_t ft_cksum(char *buf, size_t size)
+uint32_t		ft_cksum(char *buf, size_t size)
 {
-	uint32_t sum = 0;
-	uint32_t i = 0;
+	uint32_t	sum = 0;
+	uint32_t	i = 0;
 
 	while (i < size - 1) {
 		sum += *((uint16_t*)(buf + i));
 		i += 2;
 	}
-	if (size & 1)  {
+	if (size & 1)
 		sum += buf[i];
-	}
 	while (sum >> 16)
 		sum = (sum & 0xFFFF) + (sum >> 16);
 	return (~sum);
 }
 
-int		connect_sock(struct sockaddr *addr)
+int				connect_sock(struct sockaddr *addr)
 {
 	int sock;
 	int proto;
@@ -84,27 +87,26 @@ int		connect_sock(struct sockaddr *addr)
 	if ((sock = socket(addr->sa_family, SOCK_RAW, proto)) < 0)
 	{
 		perror("ft_ping: icmp open socket");
-		return -1;
+		return (-1);
 	}
 	if (connect(sock, addr, sizeof(struct sockaddr)) < 0)
 	{
 		perror("ft_ping: icmp connect socket");
-		return -1;
+		return (-1);
 	}
-	return sock;
+	return (sock);
 }
 
-int		setup_sock(int sock) {
-	// TODO: TTL ?
+int				setup_sock(int sock) {
 	struct timeval	tv;
 
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval)) < 0) {
 		perror("ft_ping: setsockopt");
-		return -1;
+		return (-1);
 	}
-	return 0;
+	return (0);
 }
 
 unsigned short	checksum(void *msg, size_t msg_len)
@@ -123,14 +125,14 @@ unsigned short	checksum(void *msg, size_t msg_len)
 	return (sum);
 }
 
-int		receive_ping(int sock, int seq, ping_t *ping)
+int				receive_ping(int sock, int seq, t_ping *ping)
 {
 	struct msghdr	msghdr;
 	struct iovec	iov;
 	char			msg[sizeof(struct ip) + PACKET_LEN];
 	struct ip		*ip;
 	struct icmphdr	*icmp;
-	char			ttl_buf[sizeof(struct cmsghdr) + 4]; // TODO: Bleh
+	char			ttl_buf[sizeof(struct cmsghdr) + 4];
 
 	iov.iov_base = &msg;
 	iov.iov_len = sizeof(msg);
@@ -146,27 +148,26 @@ int		receive_ping(int sock, int seq, ping_t *ping)
 		if (recvmsg(sock, &msghdr, 0) < 0)
 		{
 			if (errno == EAGAIN) {
-				return 2;
+				return (2);
 			} else {
 				perror("error recvmsg");
-				return FALSE;
+				return (FALSE);
 			}
 		}
 	}
 	if (gettimeofday(&ping->recv, NULL) < 0)
 	{
 		perror("error gettimeofday");
-		return FALSE;
+		return (FALSE);
 	}
 	ping->sent = *((struct timeval*)(msg + sizeof(struct ip) + sizeof(struct icmphdr)));
 	ping->seq = seq;
 	ping->size = iov.iov_len;
 	ping->ttl = ip->ip_ttl;
-	return TRUE;
+	return (TRUE);
 }
 
-
-int		send_ping(int sock, struct sockaddr *addr, socklen_t len, ping_t *ping)
+int				send_ping(int sock, struct sockaddr *addr, socklen_t len, t_ping *ping)
 {
 	char			msg[PACKET_LEN];
 	struct icmphdr	*icmp;
@@ -196,7 +197,7 @@ int		send_ping(int sock, struct sockaddr *addr, socklen_t len, ping_t *ping)
 	return receive_ping(sock, seq++, ping);
 }
 
-int	parse_args(t_opts *opts, int argc, char **argv)
+int				parse_args(t_opts *opts, int argc, char **argv)
 {
 	int i;
 	int j;
@@ -248,19 +249,19 @@ int	parse_args(t_opts *opts, int argc, char **argv)
 
 static volatile int running = 1;
 
-void int_handler(int dummy) {
+void			int_handler(int dummy) {
 	(void)dummy;
 
 	running = 0;
 }
 
-double	sub_ms(struct timeval v1, struct timeval v2) {
+double			sub_ms(struct timeval v1, struct timeval v2) {
 	return (v1.tv_sec - v2.tv_sec) * 1000 + (v1.tv_usec - v2.tv_usec) / 1000.0;
 }
 
-int	ping_loop(int sock, struct addrinfo *addr_out, t_opts *opts, char *addr_str)
+int				ping_loop(int sock, struct addrinfo *addr_out, t_opts *opts, char *addr_str)
 {
-	ping_t		ping;
+	t_ping	ping;
 	int	res;
 	unsigned	packet_transmitted = 0;
 	unsigned	packet_received = 0;
@@ -289,7 +290,7 @@ int	ping_loop(int sock, struct addrinfo *addr_out, t_opts *opts, char *addr_str)
 	return (0);
 }
 
-int	get_family(t_opts *opts)
+int				get_family(t_opts *opts)
 {
 	if (opts->v4)
 		return AF_INET;
@@ -299,7 +300,7 @@ int	get_family(t_opts *opts)
 		return AF_UNSPEC;
 }
 
-int	ft_getaddr(t_opts *opts, struct addrinfo *out) {
+int				ft_getaddr(t_opts *opts, struct addrinfo *out) {
 	struct addrinfo hints = {0};
 	struct addrinfo *addr_out;
 
@@ -319,8 +320,7 @@ int	ft_getaddr(t_opts *opts, struct addrinfo *out) {
 	return (0);
 }
 
-
-int	main(int argc, char **argv)
+int				main(int argc, char **argv)
 {
 	struct addrinfo	addr_out;
 	int		sock;
