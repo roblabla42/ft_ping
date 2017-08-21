@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/icmp6.h>
 #include <netdb.h>
 #include <errno.h>
 #include <signal.h>
@@ -169,11 +170,15 @@ int		send_ping(int sock, struct sockaddr *addr, socklen_t len, ping_t *ping)
 {
 	char			msg[PACKET_LEN];
 	struct icmphdr	*icmp;
-	static short	seq = 0;
+	static short	seq = 1;
 
 	ft_bzero(msg, PACKET_LEN);
 	icmp = (struct icmphdr*)msg;
-	icmp->type = ICMP_ECHO;
+	if (addr->sa_family == AF_INET6) {
+		icmp->type = ICMP6_ECHO_REQUEST;
+	} else {
+		icmp->type = ICMP_ECHO;
+	}
 	icmp->code = 0;
 	icmp->un.echo.sequence = ft_htons(seq);
 	icmp->un.echo.id = 12;
