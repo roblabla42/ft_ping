@@ -11,7 +11,8 @@
 
 #define PAYLOAD_LEN sizeof(struct timeval)
 #define PACKET_LEN (sizeof(struct icmphdr) + PAYLOAD_LEN)
-#define HELP_STR "Usage: ping [-hv46] destination\n"
+#define MAX_DNSLEN 1024
+#define HELP_STR "Usage: ping [-hvn] destination\n"
 
 typedef struct	s_opts
 {
@@ -19,6 +20,7 @@ typedef struct	s_opts
 	int verbose;
 	int v4;
 	int v6;
+	int numeric_output;
 	char *host;
 }		t_opts;
 
@@ -27,14 +29,29 @@ short	ft_htons(short num)
 	return num >> 8 | num << 8;
 }
 
-const char	*addr2str(struct sockaddr *addr, char *addr_str, size_t size_addr_str)
+const char	*addr2str(struct sockaddr *addr, socklen_t addrlen, int nameinfo, char **addr_str)
 {
+	const void	*res;
+	char		ip_addr[INET6_ADDRSTRLEN];
+	char		host_addr[MAX_DNSLEN];
+
+
+	(void)addrlen;
+	(void)nameinfo;
 	if (addr->sa_family == AF_INET)
-		return inet_ntop(addr->sa_family, &((struct sockaddr_in*)addr)->sin_addr, addr_str, size_addr_str);
+		res = inet_ntop(addr->sa_family, &((struct sockaddr_in*)addr)->sin_addr, ip_addr, INET6_ADDRSTRLEN);
 	else if (addr->sa_family == AF_INET6)
-		return inet_ntop(addr->sa_family, &((struct sockaddr_in6*)addr)->sin6_addr, addr_str, size_addr_str);
+		res = inet_ntop(addr->sa_family, &((struct sockaddr_in6*)addr)->sin6_addr, ip_addr, INET6_ADDRSTRLEN);
 	else
 		return (NULL);
+	if (res == NULL)
+		return (NULL);
+	if (nameinfo && getnameinfo(addr, addrlen, host_addr, MAX_DNSLEN, NULL, 0, 0) == 0) {
+		*addr_str = ft_multistrjoin(4, host_addr, " (", ip_addr, ")");
+	} else {
+		*addr_str = ft_strdup(ip_addr);
+	}
+	return *addr_str;
 }
 
 uint32_t ft_cksum(char *buf, size_t size)
@@ -205,6 +222,9 @@ int	parse_args(t_opts *opts, int argc, char **argv)
 					case '4':
 						opts->v4 = 1;
 						break;
+					case 'n':
+						opts->numeric_output = 1;
+						break;
 				}
 				j++;
 			}
@@ -251,7 +271,7 @@ int	ping_loop(int sock, struct addrinfo *addr_out, t_opts *opts, char *addr_str)
 			// Timed out
 		} else if (res) {
 			packet_received++;
-			printf("%lu bytes from %s (%s): icmp_seq=%u ttl=%u time=%lu.%lums\n", ping.size, opts->host, addr_str, ping.seq, ping.ttl, sub_ms(ping.recv, ping.sent), (ping.recv.tv_usec - ping.sent.tv_usec) % 1000);
+			printf("%lu bytes from %s: icmp_seq=%u ttl=%u time=%lu.%lums\n", ping.size, addr_str, ping.seq, ping.ttl, sub_ms(ping.recv, ping.sent), (ping.recv.tv_usec - ping.sent.tv_usec) % 1000);
 		} else {
 			return (1);
 		}
@@ -278,11 +298,9 @@ int	get_family(t_opts *opts)
 int	main(int argc, char **argv)
 {
 	struct addrinfo	*addr_out;
-	struct addrinfo	*meh;
-	struct addrinfo hints = {0};
-	char		addr_str[INET6_ADDRSTRLEN];
 	int		sock;
 	t_opts		opts;
+	char		*addr_str;
 
 	parse_args(&opts, argc, argv);
 	if (opts.help)
@@ -305,12 +323,10 @@ int	main(int argc, char **argv)
 		printf("error getaddrinfo: no ip info\n");
 		return (1);
 	}
-	if (addr2str(addr_out->ai_addr, addr_str, sizeof(addr_str)) == NULL) {
+	if (addr2str(addr_out->ai_addr, addr_out->ai_addrlen, !opts.numeric_output, &addr_str) == NULL) {
 		perror("error inet_ntop");
 		return (1);
 	}
-	getaddrinfo(addr_str, NULL, &hints, &meh);
-	printf("test = %s/%s\n", meh->ai_canonname, addr_out->ai_canonname);
 
 	if ((sock = connect_sock(addr_out->ai_addr)) <= 0)
 		return (1);
