@@ -6,7 +6,7 @@
 /*   By: rlambert <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2017/08/21 10:28:51 by rlambert          #+#    #+#             */
-/*   Updated: 2017/08/21 17:34:44 by rlambert         ###   ########.fr       */
+/*   Updated: 2017/08/21 18:07:51 by rlambert         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,8 +32,8 @@ short			ft_htons(short num)
 	return (num >> 8 | num << 8);
 }
 
-const char		*addr2str(struct sockaddr *addr, socklen_t addrlen, int nameinfo,
-		char **addr_str)
+const char		*addr2str(struct sockaddr *addr, socklen_t addrlen,
+		int nameinfo, char **addr_str)
 {
 	const void	*res;
 	char		ip_addr[INET6_ADDRSTRLEN];
@@ -51,20 +51,23 @@ const char		*addr2str(struct sockaddr *addr, socklen_t addrlen, int nameinfo,
 		return (NULL);
 	if (res == NULL)
 		return (NULL);
-	if (nameinfo && getnameinfo(addr, addrlen, host_addr, MAX_DNSLEN, NULL, 0, 0) == 0) {
+	if (nameinfo &&
+			getnameinfo(addr, addrlen, host_addr, MAX_DNSLEN, NULL, 0, 0) == 0)
 		*addr_str = ft_multistrjoin(4, host_addr, " (", ip_addr, ")");
-	} else {
+	else
 		*addr_str = ft_strdup(ip_addr);
-	}
 	return (*addr_str);
 }
 
 uint32_t		ft_cksum(char *buf, size_t size)
 {
-	uint32_t	sum = 0;
-	uint32_t	i = 0;
+	uint32_t	sum;
+	uint32_t	i;
 
-	while (i < size - 1) {
+	sum = 0;
+	i = 0;
+	while (i < size - 1)
+	{
 		sum += *((uint16_t*)(buf + i));
 		i += 2;
 	}
@@ -97,32 +100,19 @@ int				connect_sock(struct sockaddr *addr)
 	return (sock);
 }
 
-int				setup_sock(int sock) {
+int				setup_sock(int sock)
+{
 	struct timeval	tv;
 
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
-	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval)) < 0) {
+	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv,
+				sizeof(struct timeval)) < 0)
+	{
 		perror("ft_ping: setsockopt");
 		return (-1);
 	}
 	return (0);
-}
-
-unsigned short	checksum(void *msg, size_t msg_len)
-{
-	short *data = msg;
-	size_t i;
-	unsigned short sum;
-
-	i = 0;
-	sum = 0;
-	while (i < msg_len)
-	{
-		sum += data[i];
-		i++;
-	}
-	return (sum);
 }
 
 int				receive_ping(int sock, int seq, t_ping *ping)
@@ -144,12 +134,14 @@ int				receive_ping(int sock, int seq, t_ping *ping)
 	ip = (struct ip*)msg;
 	icmp = (struct icmphdr*)(msg + sizeof(struct ip));
 	icmp->type = ICMP_ECHO;
-	while (icmp->type != ICMP_ECHOREPLY || ntohs(icmp->un.echo.sequence) != seq) {
+	while (icmp->type != ICMP_ECHOREPLY || ntohs(icmp->un.echo.sequence) != seq)
+	{
 		if (recvmsg(sock, &msghdr, 0) < 0)
 		{
-			if (errno == EAGAIN) {
+			if (errno == EAGAIN)
 				return (2);
-			} else {
+			else
+			{
 				perror("error recvmsg");
 				return (FALSE);
 			}
@@ -175,26 +167,25 @@ int				send_ping(int sock, struct sockaddr *addr, socklen_t len, t_ping *ping)
 
 	ft_bzero(msg, PACKET_LEN);
 	icmp = (struct icmphdr*)msg;
-	if (addr->sa_family == AF_INET6) {
+	if (addr->sa_family == AF_INET6)
 		icmp->type = ICMP6_ECHO_REQUEST;
-	} else {
+	else
 		icmp->type = ICMP_ECHO;
-	}
 	icmp->code = 0;
 	icmp->un.echo.sequence = ft_htons(seq);
 	icmp->un.echo.id = 12;
 	if (gettimeofday((struct timeval*)(msg + sizeof(struct icmphdr)), NULL) < 0) {
 		perror("error gettimeofday");
-		return FALSE;
+		return (FALSE);
 	}
 	icmp->checksum = 0;
 	icmp->checksum = ft_cksum(msg, sizeof(msg));
 	if (sendto(sock, msg, sizeof(msg), 0, addr, len) < 0)
 	{
 		perror("ft_ping: icmp send packet");
-		return FALSE;
+		return (FALSE);
 	}
-	return receive_ping(sock, seq++, ping);
+	return (receive_ping(sock, seq++, ping));
 }
 
 int				parse_args(t_opts *opts, int argc, char **argv)
@@ -214,24 +205,16 @@ int				parse_args(t_opts *opts, int argc, char **argv)
 			j = 1;
 			while (argv[i][j] != '\0')
 			{
-				switch (argv[i][j])
-				{
-					case 'h':
-						opts->help = 1;
-						break;
-					case 'v':
-						opts->verbose = 1;
-						break;
-					case '6':
-						opts->v6 = 1;
-						break;
-					case '4':
-						opts->v4 = 1;
-						break;
-					case 'n':
-						opts->numeric_output = 1;
-						break;
-				}
+				if (argv[i][j] == 'h')
+					opts->help = 1;
+				if (argv[i][j] == 'v')
+					opts->verbose = 1;
+				if (argv[i][j] == '6')
+					opts->v6 = 1;
+				if (argv[i][j] == '4')
+					opts->v4 = 1;
+				if (argv[i][j] == 'n')
+					opts->numeric_output = 1;
 				j++;
 			}
 		} else if (opts->host == NULL) {
@@ -273,14 +256,12 @@ int				ping_loop(int sock, struct addrinfo *addr_out, t_opts *opts, char *addr_s
 	while (running) {
 		res = send_ping(sock, addr_out->ai_addr, addr_out->ai_addrlen, &ping);
 		packet_transmitted++;
-		if (res == 2) {
-			// Timed out
-		} else if (res) {
+		if (res == 1)
+		{
 			packet_received++;
 			printf("%lu bytes from %s: icmp_seq=%u ttl=%u time=%.2f ms\n", ping.size, addr_str, ping.seq, ping.ttl, sub_ms(ping.recv, ping.sent));
-		} else {
+		} else if (!res)
 			return (1);
-		}
 		sleep(1);
 	}
 	gettimeofday(&end_time, NULL);
