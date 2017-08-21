@@ -249,8 +249,8 @@ void int_handler(int dummy) {
 	running = 0;
 }
 
-unsigned long	sub_ms(struct timeval v1, struct timeval v2) {
-	return (v1.tv_sec - v2.tv_sec) * 1000 + (v1.tv_usec - v2.tv_usec) / 1000;
+double	sub_ms(struct timeval v1, struct timeval v2) {
+	return (v1.tv_sec - v2.tv_sec) * 1000 + (v1.tv_usec - v2.tv_usec) / 1000.0;
 }
 
 int	ping_loop(int sock, struct addrinfo *addr_out, t_opts *opts, char *addr_str)
@@ -271,7 +271,7 @@ int	ping_loop(int sock, struct addrinfo *addr_out, t_opts *opts, char *addr_str)
 			// Timed out
 		} else if (res) {
 			packet_received++;
-			printf("%lu bytes from %s: icmp_seq=%u ttl=%u time=%lu.%lums\n", ping.size, addr_str, ping.seq, ping.ttl, sub_ms(ping.recv, ping.sent), (ping.recv.tv_usec - ping.sent.tv_usec) % 1000);
+			printf("%lu bytes from %s: icmp_seq=%u ttl=%u time=%.2f ms\n", ping.size, addr_str, ping.seq, ping.ttl, sub_ms(ping.recv, ping.sent));
 		} else {
 			return (1);
 		}
@@ -279,7 +279,7 @@ int	ping_loop(int sock, struct addrinfo *addr_out, t_opts *opts, char *addr_str)
 	}
 	gettimeofday(&end_time, NULL);
 	printf("\n--- %s ping statistics ---\n", opts->host);
-	printf("%u packets transmitted, %u received, %u%% packet loss, time %lums\n", packet_transmitted, packet_received, 100 - (packet_received * 100 / packet_transmitted), sub_ms(end_time, start_time));
+	printf("%u packets transmitted, %u received, %u%% packet loss, time %.0fms\n", packet_transmitted, packet_received, 100 - (packet_received * 100 / packet_transmitted), sub_ms(end_time, start_time));
 	//printf("%u min/avg/max/mdev = %u/%u/%u/%u\n", min_ping, avg_ping, max_ping, deriv_ping);
 	return (0);
 }
